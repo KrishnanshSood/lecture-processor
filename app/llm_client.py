@@ -3,47 +3,10 @@ import os
 from typing import List, Dict
 import asyncio
 
-class BaseLLMClient:
-    async def summarize(self, text: str) -> str:
-        raise NotImplementedError()
-
-    async def generate_quiz(self, text: str) -> List[Dict]:
-        raise NotImplementedError()
-
-    async def generate_flashcards(self, text: str) -> List[Dict]:
-        raise NotImplementedError()
-
-    async def localize(self, text: str, locale: str) -> str:
-        raise NotImplementedError()
-
-# Dummy LLM client for local testing
-class DummyLLMClient(BaseLLMClient):
-    async def summarize(self, text: str) -> str:
-        return "This is a dummy summary."
-
-    async def generate_quiz(self, text: str) -> List[Dict]:
-        return [
-            {"question": "What is a dummy question?", "options": ["A", "B", "C", "D"], "answer": 0}
-        ]
-
-    async def generate_flashcards(self, text: str) -> List[Dict]:
-        return [
-            {"question": "Dummy flashcard Q?", "answer": "Dummy flashcard A."}
-        ]
-
-    async def localize(self, text: str, locale: str) -> str:
-        return f"[Localized to {locale}]: {text}"
-
-
-
-    async def localize(self, text: str, locale: str) -> str:
-        raise NotImplementedError()
-
-
-# Example OpenAI-based implementation (synchronous calls; wrap in threadpool for production)
-
 import os
 from typing import List, Dict
+import asyncio
+import google.generativeai as genai
 
 class BaseLLMClient:
     async def summarize(self, text: str) -> str:
@@ -52,13 +15,11 @@ class BaseLLMClient:
     async def generate_quiz(self, text: str) -> List[Dict]:
         raise NotImplementedError()
 
-    async def localize(self, text: str, locale: str) -> str:
+    async def generate_flashcards(self, text: str) -> List[Dict]:
         raise NotImplementedError()
 
-# Gemini implementation
-import google.generativeai as genai
-
-
+    async def localize(self, text: str, locale: str) -> str:
+        raise NotImplementedError()
 
 class GeminiLLMClient(BaseLLMClient):
     def __init__(self, api_key: str = None, model: str = "models/gemini-1.5-pro-latest"):
