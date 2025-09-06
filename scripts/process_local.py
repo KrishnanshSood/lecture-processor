@@ -30,9 +30,10 @@ async def main():
     except Exception as e:
         print(f"[ERROR] ffmpeg failed: {e}")
 
-    from app.llm_client import GeminiLLMClient
-    llm = GeminiLLMClient()
-    trans = DummyTranscriber()
+    from app.llm_client import OpenAILLMClient
+    from app.transcribe import WhisperTranscriber
+    llm = OpenAILLMClient()
+    trans = WhisperTranscriber()
     print("[DEBUG] Starting process_file_local...")
     try:
         job = await process_file_local(short_audio_path, "lecture_10s.wav", llm, trans, ["hi-IN"])

@@ -2,7 +2,7 @@ import uuid
 import os
 import asyncio
 from .storage import upload_file_path, upload_fileobj
-from .transcribe import extract_audio_from_video, DummyTranscriber
+from .transcribe import extract_audio_from_video, DummyTranscriber, chunk_text
 from .chunker import make_chunks
 from .llm_client import GeminiLLMClient, BaseLLMClient
 from .models import Job, Results
@@ -35,8 +35,8 @@ async def process_file_local(path: str, filename: str, llm_client: BaseLLMClient
             with open(path, "r", encoding="utf-8") as f:
                 transcript = f.read()
 
-        # 3) Chunk transcript
-        chunks = make_chunks(transcript)
+        # 3) Chunk transcript (use token-based chunking for Gemini)
+        chunks = chunk_text(transcript, max_tokens=400)
 
         # 4) Parallel LLM tasks per chunk then reduce
         summary_parts = []
@@ -44,6 +44,7 @@ async def process_file_local(path: str, filename: str, llm_client: BaseLLMClient
         flashcards = []
         localized = {}
 
+        import asyncio
         async def process_chunk(chunk_text):
             print("Calling LLM: summarize...")
             try:
@@ -52,6 +53,7 @@ async def process_file_local(path: str, filename: str, llm_client: BaseLLMClient
             except Exception as e:
                 print(f"LLM summarize: failed: {e}")
                 s = f"ERROR: {e}"
+            await asyncio.sleep(2)
             print("Calling LLM: generate_quiz...")
             try:
                 q = await llm_client.generate_quiz(chunk_text)
@@ -59,6 +61,7 @@ async def process_file_local(path: str, filename: str, llm_client: BaseLLMClient
             except Exception as e:
                 print(f"LLM generate_quiz: failed: {e}")
                 q = [f"ERROR: {e}"]
+            await asyncio.sleep(2)
             print("Calling LLM: generate_flashcards...")
             try:
                 f = await llm_client.generate_flashcards(chunk_text)
@@ -66,6 +69,7 @@ async def process_file_local(path: str, filename: str, llm_client: BaseLLMClient
             except Exception as e:
                 print(f"LLM generate_flashcards: failed: {e}")
                 f = [f"ERROR: {e}"]
+            await asyncio.sleep(2)
             return s, q, f
 
         tasks = [process_chunk(c) for c in chunks]
@@ -77,14 +81,19 @@ async def process_file_local(path: str, filename: str, llm_client: BaseLLMClient
 
         # 5) Compose final summary (simple concat + top-level summarize)
         long_summary = "\n\n".join(summary_parts)
-        # call LLM to compress
-        print("Calling LLM: summarize (final_summary)...")
-        try:
-            final_summary = await llm_client.summarize(long_summary)
-            print("LLM summarize (final_summary): success")
-        except Exception as e:
-            print(f"LLM summarize (final_summary): failed: {e}")
-            final_summary = f"ERROR: {e}"
+        # Chunk the long summary again to stay under token limit
+        summary_chunks = chunk_text(long_summary, max_tokens=400)
+        compressed_parts = []
+        print("Calling LLM: summarize (final_summary, chunked)...")
+        for chunk in summary_chunks:
+            try:
+                compressed = await llm_client.summarize(chunk)
+                print("LLM summarize (final_summary chunk): success")
+            except Exception as e:
+                print(f"LLM summarize (final_summary chunk): failed: {e}")
+                compressed = f"ERROR: {e}"
+            compressed_parts.append(compressed)
+        final_summary = "\n\n".join(compressed_parts)
 
         # 6) Localization (for each language)
         locales = locales or ["hi-IN"]

@@ -4,6 +4,7 @@ import os
 from .pipeline import process_file_local
 from .llm_client import GeminiLLMClient
 from .transcribe import DummyTranscriber
+from .extractors import extract_text_from_pdf
 
 app = FastAPI()
 
@@ -13,6 +14,7 @@ TRANSCRIBER = DummyTranscriber()
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "/tmp/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
 @app.post("/upload")
 async def upload(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     job_id = str(uuid.uuid4())
@@ -21,9 +23,17 @@ async def upload(file: UploadFile = File(...), background_tasks: BackgroundTasks
         content = await file.read()
         f.write(content)
 
-    # enqueue background processing
-    background_tasks.add_task(process_file_local, out_path, file.filename, LLM, TRANSCRIBER, ["hi-IN", "es-ES"])
-    return {"job_id": job_id, "status": "queued"}
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext == ".pdf":
+        # Directly process PDF for summary and flashcards
+        text = extract_text_from_pdf(out_path)
+        summary = await LLM.summarize(text)
+        flashcards = await LLM.generate_flashcards(text)
+        return {"job_id": job_id, "status": "done", "summary": summary, "flashcards": flashcards}
+    else:
+        # enqueue background processing for other file types
+        background_tasks.add_task(process_file_local, out_path, file.filename, LLM, TRANSCRIBER, ["hi-IN", "es-ES"])
+        return {"job_id": job_id, "status": "queued"}
 
 @app.get("/health")
 async def health():

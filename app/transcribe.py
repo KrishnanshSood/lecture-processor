@@ -28,6 +28,7 @@ def chunk_text(text: str, max_tokens: int = 800) -> List[str]:
 
 from typing import List
 
+
 class BaseTranscriber:
     async def transcribe(self, audio_path: str) -> str:
         """Return full transcript as string"""
@@ -37,3 +38,15 @@ class DummyTranscriber(BaseTranscriber):
     async def transcribe(self, audio_path: str) -> str:
         # placeholder for testing
         return "This is a dummy transcript of the lecture audio. Replace with real transcriber."
+
+# Whisper-based transcriber
+class WhisperTranscriber(BaseTranscriber):
+    def __init__(self, model_name="base"):
+        import whisper
+        self.model = whisper.load_model(model_name)
+
+    async def transcribe(self, audio_path: str) -> str:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, self.model.transcribe, audio_path)
+        return result["text"]
