@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+boto3
+pydantic
+requests
+aiofiles
+python-dotenv
+ffmpeg-python
+PyPDF2
+python-pptx
+tenacity
+google-generativeai
+aiohttp
